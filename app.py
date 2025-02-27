@@ -5,7 +5,7 @@ import numpy as np
 app = Flask(__name__)
 
 # Load the TFLite model
-interpreter = tf.lite.Interpreter(model_path="model.tflite")
+interpreter = tf.lite.Interpreter(model_path="sign_language_model.tflite")
 interpreter.allocate_tensors()
 
 def predict(input_data):
