@@ -8,7 +8,6 @@ from io import BytesIO
 from flask import Flask, request, jsonify, render_template, send_from_directory
 import tensorflow as tf
 from waitress import serve
-import socket
 
 app = Flask(__name__, static_folder='static')
 
@@ -37,29 +36,20 @@ SIGN_CLASSES = [
     'space', 'delete', 'nothing'
 ]
 
-# Load the TFLite model
-def load_model():
-    # Verify the model file exists
-    if not os.path.exists(MODEL_PATH):
-        raise FileNotFoundError(f"Model file not found at: {MODEL_PATH}")
-    
-    try:
-        interpreter = tf.lite.Interpreter(model_path=MODEL_PATH)
-        interpreter.allocate_tensors()
-        input_details = interpreter.get_input_details()
-        output_details = interpreter.get_output_details()
-        logger.info(f"Model loaded successfully. Input shape: {input_details[0]['shape']}")
-        return interpreter, input_details, output_details
-    except Exception as e:
-        logger.error(f"Failed to load model: {str(e)}")
-        raise
+# Verify the model file exists
+if not os.path.exists(MODEL_PATH):
+    raise FileNotFoundError(f"Model file not found at: {MODEL_PATH}")
 
-# Initialize model
+# Load the TFLite model
 try:
-    interpreter, input_details, output_details = load_model()
+    interpreter = tf.lite.Interpreter(model_path=MODEL_PATH)
+    interpreter.allocate_tensors()
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
+    logger.info(f"Model loaded successfully. Input shape: {input_details[0]['shape']}")
 except Exception as e:
-    logger.error(f"Model initialization failed: {str(e)}")
-    # Continue execution - will handle the error if predictions are attempted
+    logger.error(f"Failed to load model: {str(e)}")
+    raise
 
 def allowed_file(filename):
     """Check if the file extension is allowed"""
@@ -273,25 +263,8 @@ if __name__ == '__main__':
     # Create template file if needed
     create_template_file()
     
-    # Find an available port
-    port = 5000
-    max_port = 5010  # Try ports 5000-5010
-    
-    while port <= max_port:
-        try:
-            # Try to create a socket to see if the port is available
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.bind(('0.0.0.0', port))
-            sock.close()
-            # If we get here, the port is available
-            break
-        except OSError:
-            logger.warning(f"Port {port} is in use, trying port {port+1}")
-            port += 1
-    
-    if port > max_port:
-        logger.error("Could not find an available port in the specified range")
-        port = 8080  # Fallback to a likely-available port
+    # Use the PORT environment variable provided by Render
+    port = int(os.environ.get('PORT', 10000))
     
     # Start the server
     logger.info(f"Starting server on port {port}")
