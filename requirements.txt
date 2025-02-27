@@ -5,4 +5,4 @@ waitress==3.0.2
 tensorflow==2.18.0
 numpy==2.0
 pillow==11.1.0
-opencv==4.9.0 
+opencv-python==4.9.0.80 
