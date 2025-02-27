@@ -1,5 +1,5 @@
 import os
-import socket
+import logging
 from flask import Flask, request, jsonify
 import tensorflow as tf
 import numpy as np
@@ -7,8 +7,16 @@ from waitress import serve
 
 app = Flask(__name__)
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+
+# Verify the model file exists
+model_path = "sign_language_model.tflite"
+if not os.path.exists(model_path):
+    raise FileNotFoundError(f"Model file not found at: {model_path}")
+
 # Load the TFLite model
-interpreter = tf.lite.Interpreter(model_path="sign_language_model.tflite")
+interpreter = tf.lite.Interpreter(model_path=model_path)
 interpreter.allocate_tensors()
 
 def predict(input_data):
@@ -30,6 +38,10 @@ def home():
     <p>Use the <code>/predict</code> endpoint to make predictions.</p>
     """
 
+@app.route('/script-health-check', methods=['GET'])
+def health_check():
+    return jsonify({"status": "healthy"}), 200
+
 @app.route('/predict', methods=['POST'])
 def predict_route():
     try:
@@ -41,17 +53,14 @@ def predict_route():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
-def find_available_port(start_port=5000):
-    port = start_port
-    while True:
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(('0.0.0.0', port))
-                return port
-        except OSError:
-            port += 1
+@app.before_request
+def log_request_info():
+    app.logger.info(f"Incoming request: {request.method} {request.path}")
+
+@app.after_request
+def log_response_info(response):
+    app.logger.info(f"Outgoing response: {response.status}")
+    return response
 
 if __name__ == '__main__':
-    port = find_available_port()
-    print(f"Running on port {port}")
-    serve(app, host='0.0.0.0', port=port)
+    serve(app, host='0.0.0.0', port=5000, threads=4, connection_limit=1000)
