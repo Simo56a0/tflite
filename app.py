@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 import tensorflow as tf
 import numpy as np
+from waitress import serve  # Import Waitress
 
 app = Flask(__name__)
 
@@ -31,4 +32,5 @@ def predict_route():
         return jsonify({"error": str(e)}), 400
 
 if __name__ == '__main__':
-    app.run()
+    # Use Waitress to serve the app in production
+    serve(app, host='0.0.0.0', port=5001)
