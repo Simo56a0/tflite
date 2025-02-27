@@ -1,8 +1,8 @@
 gunicorn==23.0.0
 logging==0.4.9.6
-flask==2.3.3
-waitress==2.1.2
-tensorflow==2.15.0
-numpy==1.24.3
-pillow==10.0.1
-opencv-python==4.8.1.78
+flask==3.1.0
+waitress==3.0.2
+tensorflow==2.18.0
+numpy==2.2.3
+pillow==11.1.0
+opencv-python==4.11.0.86
