@@ -1,7 +1,9 @@
+import os
+import socket
 from flask import Flask, request, jsonify
 import tensorflow as tf
 import numpy as np
-from waitress import serve  # Import Waitress
+from waitress import serve
 
 app = Flask(__name__)
 
@@ -20,6 +22,14 @@ def predict(input_data):
     output_data = interpreter.get_tensor(output_details[0]['index'])
     return output_data.tolist()
 
+@app.route('/')
+def home():
+    return """
+    <h1>Sign Language Model API</h1>
+    <p>Welcome to the Sign Language Model API!</p>
+    <p>Use the <code>/predict</code> endpoint to make predictions.</p>
+    """
+
 @app.route('/predict', methods=['POST'])
 def predict_route():
     try:
@@ -31,6 +41,17 @@ def predict_route():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
+def find_available_port(start_port=5000):
+    port = start_port
+    while True:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('0.0.0.0', port))
+                return port
+        except OSError:
+            port += 1
+
 if __name__ == '__main__':
-    # Use Waitress to serve the app in production
-    serve(app, host='0.0.0.0', port=5001)
+    port = find_available_port()
+    print(f"Running on port {port}")
+    serve(app, host='0.0.0.0', port=port)
