@@ -357,44 +357,48 @@
 
     <script>
         // Simple tab functionality
-        document.querySelectorAll('.toggle-btn').forEach(button => {
-            button.addEventListener('click', () => {
-                // Remove active class from all buttons and tabs
-                document.querySelectorAll('.toggle-btn').forEach(btn => btn.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-                
-                // Add active class to clicked button and corresponding tab
-                button.classList.add('active');
-                document.getElementById(`${button.dataset.tab}-tab`).classList.add('active');
-            });
-        });
+        document.getElementById("uploadForm").addEventListener("submit", function(event) {
+    event.preventDefault();
+    
+    const fileInput = document.getElementById("fileUpload");
+    const file = fileInput.files[0];
+    const previewContainer = document.getElementById("preview");
+    const translationResult = document.getElementById("translationResult");
+    
+    previewContainer.innerHTML = "";
+    translationResult.innerHTML = "";
+    
+    if (file) {
+        const fileType = file.type;
+        const reader = new FileReader();
         
-        // File upload preview functionality would go here
-        const fileInput = document.getElementById('file-input');
-        const uploadArea = document.querySelector('.upload-area');
-        
-        uploadArea.addEventListener('click', () => {
-            fileInput.click();
-        });
-        
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
-        });
-        
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
-        });
-        
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            
-            if (e.dataTransfer.files.length) {
-                fileInput.files = e.dataTransfer.files;
-                // Handle file preview
+        reader.onload = function(e) {
+            if (fileType.startsWith("image")) {
+                const img = document.createElement("img");
+                img.src = e.target.result;
+                img.alt = "Uploaded Image";
+                img.style.maxWidth = "100%";
+                previewContainer.appendChild(img);
+            } else if (fileType.startsWith("video")) {
+                const video = document.createElement("video");
+                video.src = e.target.result;
+                video.controls = true;
+                video.style.maxWidth = "100%";
+                previewContainer.appendChild(video);
             }
-        });
+        };
+        
+        reader.readAsDataURL(file);
+        
+        // Simulate translation processing
+        setTimeout(() => {
+            translationResult.innerHTML = "<p><strong>Translation:</strong> Example translated text from sign language.</p>";
+        }, 2000);
+    } else {
+        alert("Please select a file to upload.");
+    }
+});
+
     </script>
 </body>
 </html>
