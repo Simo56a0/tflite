@@ -1,5 +1,3 @@
-// Create a static/js directory and save this as main.js
-
 document.addEventListener('DOMContentLoaded', function() {
     // DOM Elements
     const cameraButton = document.querySelector('.btn-primary');
@@ -11,6 +9,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const translationResult = document.querySelector('.translation-result');
     const copyButton = document.querySelector('.actions .btn-outline:first-child');
     const speechButton = document.querySelector('.actions .btn-outline:last-child');
+    
+    // New DOM Elements for Feature Extraction
+    const featureFileInput = document.getElementById('feature-file-input');
+    const featureUploadArea = document.querySelector('.feature-upload-area');
+    const featureVideoPreview = document.getElementById('feature-video-preview');
+    const featureExtractButton = document.getElementById('extract-features-btn');
+    const featureResultBox = document.getElementById('feature-result-box');
+    const featureResult = document.getElementById('feature-result');
+    const featureProgressContainer = document.getElementById('feature-progress-container');
+    const featureProgressBar = document.getElementById('feature-progress-bar');
     
     // Tab switching
     document.querySelectorAll('.toggle-btn').forEach(button => {
@@ -30,6 +38,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let videoElement = null;
     let capturedImage = null;
     let activeMode = 'camera'; // 'camera' or 'upload'
+    let featureVideoFile = null; // Store the uploaded video file for feature extraction
     
     // Initialize video element
     function initializeVideo() {
@@ -318,6 +327,63 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // Feature Extraction: Handle file upload
+    function handleFeatureFileUpload(file) {
+        if (!file) return;
+        
+        // Store the video file
+        featureVideoFile = file;
+        
+        // Display video preview
+        const videoURL = URL.createObjectURL(file);
+        featureVideoPreview.src = videoURL;
+        featureVideoPreview.style.display = 'block';
+        
+        // Enable extract button
+        featureExtractButton.disabled = false;
+    }
+    
+    // Feature Extraction: Extract features from video
+    async function extractFeatures() {
+        if (!featureVideoFile) {
+            featureResultBox.innerHTML = '<p>Please upload a video first.</p>';
+            return;
+        }
+        
+        try {
+            // Show progress
+            featureProgressContainer.style.display = 'block';
+            featureProgressBar.style.width = '0%';
+            featureExtractButton.disabled = true;
+            
+            // Submit the file to the feature extraction endpoint
+            const formData = new FormData();
+            formData.append('file', featureVideoFile);
+            
+            const response = await fetch('/extract-features', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            
+            // Show result
+            featureProgressBar.style.width = '100%';
+            featureResultBox.style.display = 'block';
+            featureResult.textContent = JSON.stringify(result.features, null, 2);
+            
+        } catch (error) {
+            console.error('Feature extraction error:', error);
+            featureResultBox.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+        } finally {
+            featureExtractButton.disabled = false;
+        }
+    }
+    
     // Event listeners
     cameraButton.addEventListener('click', function() {
         if (stream) {
@@ -363,7 +429,39 @@ document.addEventListener('DOMContentLoaded', function() {
     
     speechButton.addEventListener('click', textToSpeech);
     
+    // Feature Extraction: Event listeners
+    featureFileInput.addEventListener('change', function() {
+        if (this.files && this.files[0]) {
+            handleFeatureFileUpload(this.files[0]);
+        }
+    });
+    
+    featureUploadArea.addEventListener('click', function() {
+        featureFileInput.click();
+    });
+    
+    featureUploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        this.classList.add('dragover');
+    });
+    
+    featureUploadArea.addEventListener('dragleave', function() {
+        this.classList.remove('dragover');
+    });
+    
+    featureUploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        this.classList.remove('dragover');
+        
+        if (e.dataTransfer.files.length) {
+            handleFeatureFileUpload(e.dataTransfer.files[0]);
+        }
+    });
+    
+    featureExtractButton.addEventListener('click', extractFeatures);
+    
     // Initialize
     translateButton.disabled = true;
     captureButton.disabled = true;
+    featureExtractButton.disabled = true;
 });
