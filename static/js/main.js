@@ -45,27 +45,96 @@ document.addEventListener('DOMContentLoaded', function() {
             videoPreview.src = videoURL;
             videoPreview.style.display = 'block';
             videoPreview.controls = true;
+            
+            // Set up to process video when loaded
+            videoPreview.onloadedmetadata = function() {
+                // Show loading state
+                translationResult.innerHTML = '<p>Video loaded. Processing will begin when you play the video.</p>';
+            };
+            
+            // Start processing when video plays
+            videoPreview.onplay = function() {
+                extractFramesAndTranslate(this, file);
+            };
         }
     });
 
-    // Extract frames from video
-    videoPreview.addEventListener('play', function() {
-        extractFrames(this);
-    });
-
-    function extractFrames(videoElement) {
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        const frameRate = 1; // Extract one frame per second
+    // Extract frames from video and send for translation
+    async function extractFramesAndTranslate(videoElement, videoFile) {
+        // Show loading state
+        translationResult.innerHTML = '<p>Extracting frames and analyzing sign language...</p>';
         
-        videoElement.addEventListener('timeupdate', function() {
-            if (!videoElement.paused && !videoElement.ended) {
-                canvas.width = videoElement.videoWidth;
-                canvas.height = videoElement.videoHeight;
-                context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-                const frameData = canvas.toDataURL('image/png');
-                sendFramesToModel(frameData);
+        try {
+            // Extract 10 frames from the video
+            const frames = await extractFrames(videoElement);
+            console.log(`Extracted ${frames.length} frames from video`);
+            
+            // Send frames to backend for translation
+            const result = await sendFramesToModel(frames);
+            
+            // Display the translation result
+            if (result.error) {
+                translationResult.innerHTML = `<p class="error">Error: ${result.error}</p>`;
+            } else {
+                translationResult.innerHTML = `
+                    <h2 style="font-size: 36px; margin-bottom: 10px;">${result.translation}</h2>
+                    <p>Confidence: ${(result.confidence * 100).toFixed(2)}%</p>
+                `;
+                
+                // Add to history
+                addToHistory(result.translation, frames[0]);
             }
+        } catch (error) {
+            console.error('Error processing video:', error);
+            translationResult.innerHTML = `<p class="error">Processing error: ${error.message}</p>`;
+        }
+    }
+
+    // Extract 10 frames evenly distributed throughout the video
+    function extractFrames(videoElement) {
+        return new Promise((resolve) => {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            const frames = [];
+            const numFrames = 10; // Number of frames to extract
+            
+            canvas.width = videoElement.videoWidth;
+            canvas.height = videoElement.videoHeight;
+            
+            // Calculate timestamps for even distribution of frames
+            const videoDuration = videoElement.duration;
+            const frameInterval = videoDuration / (numFrames + 1);
+            const frameTimestamps = Array.from({length: numFrames}, (_, i) => frameInterval * (i + 1));
+            
+            // Function to capture frame at specific time
+            const captureFrameAt = (time) => {
+                return new Promise((resolveFrame) => {
+                    videoElement.currentTime = time;
+                    
+                    videoElement.addEventListener('seeked', function onSeeked() {
+                        // Draw the video frame to the canvas
+                        context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+                        // Convert to base64 and add to frames array
+                        const frameData = canvas.toDataURL('image/jpeg');
+                        frames.push(frameData);
+                        
+                        // Remove event listener to prevent multiple triggers
+                        videoElement.removeEventListener('seeked', onSeeked);
+                        resolveFrame();
+                    }, { once: true });
+                });
+            };
+            
+            // Sequentially capture all frames
+            async function captureAllFrames() {
+                for (const timestamp of frameTimestamps) {
+                    await captureFrameAt(timestamp);
+                }
+                // Return all captured frames
+                resolve(frames);
+            }
+            
+            captureAllFrames();
         });
     }
 
@@ -78,13 +147,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({ frames })
             });
 
-            if (!response.ok) throw new Error("Translation request failed");
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Translation request failed: ${errorText}`);
+            }
 
             const data = await response.json();
             console.log("Translation Result:", data);
-            translationResult.textContent = data.translation || "No translation found";
+            return data;
         } catch (error) {
             console.error("Translation error:", error);
+            throw error;
         }
     }
 
@@ -268,7 +341,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 formData.append('file', blob, 'image.jpg');
                 
-                response = await fetch('/predict', {
+                response = await fetch('/predict-image', {
                     method: 'POST',
                     body: formData
                 });
@@ -289,7 +362,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <p>Confidence: ${(result.confidence * 100).toFixed(2)}%</p>
                 `;
                 
-                // Add to history (in a real app, this would be saved to a database)
+                // Add to history
                 addToHistory(result.class, capturedImage);
             }
             
@@ -337,7 +410,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (historyItems.length >= 5) {
             historyContainer.removeChild(historyItems[historyItems.length - 1]);
         }
-        historyContainer.insertBefore(historyItem, historyItems[0]);
+        historyContainer.insertBefore(historyItem, historyContainer.firstChild);
     }
     
     // Event Listeners
@@ -381,7 +454,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const formData = new FormData();
             formData.append('file', featureVideoFile);
             
-            const response = await fetch('/extract-features', {
+            const response = await fetch('/predict-video', {
                 method: 'POST',
                 body: formData
             });
@@ -397,8 +470,14 @@ document.addEventListener('DOMContentLoaded', function() {
             featureProgressContainer.style.display = 'none';
             featureResultBox.style.display = 'block';
             
-            if (data.features) {
-                featureResult.innerHTML = `<pre>${JSON.stringify(data.features, null, 2)}</pre>`;
+            if (data.class) {
+                featureResult.innerHTML = `
+                    <h3>Detected Sign: ${data.class}</h3>
+                    <p>Individual frame predictions:</p>
+                    <pre>${JSON.stringify(data.predictions, null, 2)}</pre>
+                `;
+            } else if (data.error) {
+                featureResult.innerHTML = `<p class="error">Error: ${data.error}</p>`;
             }
             
         } catch (error) {
@@ -407,6 +486,29 @@ document.addEventListener('DOMContentLoaded', function() {
             featureProgressContainer.style.display = 'none';
             featureResultBox.style.display = 'block';
             featureResult.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+        }
+    });
+
+    // Handle copy text button
+    copyButton?.addEventListener('click', function() {
+        const text = translationResult.textContent.trim();
+        if (text) {
+            navigator.clipboard.writeText(text)
+                .then(() => {
+                    alert('Text copied to clipboard!');
+                })
+                .catch(err => {
+                    console.error('Failed to copy text: ', err);
+                });
+        }
+    });
+
+    // Handle text to speech button
+    speechButton?.addEventListener('click', function() {
+        const text = translationResult.textContent.trim();
+        if (text && window.speechSynthesis) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            window.speechSynthesis.speak(utterance);
         }
     });
 });
