@@ -110,6 +110,30 @@ def predict_video():
     else:
         return jsonify({"error": "Invalid file type"}), 400
 
+# New route for image prediction
+@app.route('/predict-image', methods=['POST'])
+def predict_image():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+    
+    if file and allowed_file(file.filename):
+        # Save image to upload folder
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+        file.save(file_path)
+        
+        # Open the image and preprocess it
+        img = cv2.imread(file_path)
+        result = predict(img)
+        os.remove(file_path)
+        
+        return jsonify(result)
+    else:
+        return jsonify({"error": "Invalid file type"}), 400
+
 @app.route('/')
 def home():
     return render_template('index.html')
