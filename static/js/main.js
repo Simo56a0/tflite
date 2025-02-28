@@ -32,6 +32,51 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById(`${button.dataset.tab}-tab`).classList.add('active');
         });
     });
+    document.getElementById("videoInput").addEventListener("change", function(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const videoElement = document.getElementById("videoElement");
+        videoElement.src = URL.createObjectURL(file);
+    }
+});
+
+            document.getElementById("videoElement").addEventListener("play", function() {
+                extractFrames(this);
+            });
+            
+            function extractFrames(videoElement) {
+                const canvas = document.createElement("canvas");
+                const context = canvas.getContext("2d");
+                const frameRate = 1; // Extract one frame per second
+                
+                videoElement.addEventListener("timeupdate", function() {
+                    if (!videoElement.paused && !videoElement.ended) {
+                        canvas.width = videoElement.videoWidth;
+                        canvas.height = videoElement.videoHeight;
+                        context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+                        const frameData = canvas.toDataURL("image/png");
+                        sendFramesToModel(frameData);
+                    }
+                });
+            }
+            
+            function sendFramesToModel(frameData) {
+                fetch("https://your-api-endpoint.com/analyze", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ image: frameData })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log("Frame analysis result:", data);
+                })
+                .catch(error => {
+                    console.error("Error sending frame to model:", error);
+                });
+            }
+
     
     // Global variables
     let stream = null;
@@ -178,7 +223,24 @@ document.addEventListener('DOMContentLoaded', function() {
         
         reader.readAsDataURL(file);
     }
-    
+    async function sendFramesToModel(frames) {
+    try {
+        const response = await fetch('/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ frames })
+        });
+
+        if (!response.ok) throw new Error("Translation request failed");
+
+        const data = await response.json();
+        console.log("Translation Result:", data);
+        translationResult.textContent = data.translation || "No translation found";
+    } catch (error) {
+        console.error("Translation error:", error);
+    }
+}
+
     // Translate sign language
     async function translateSign() {
         if (!capturedImage) {
@@ -243,6 +305,33 @@ document.addEventListener('DOMContentLoaded', function() {
             translationResult.innerHTML = `<p class="error">Translation error: ${error.message}</p>`;
         }
     }
+    function extractFrames(video, frameCount = 10) {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    const frames = [];
+    let currentTime = 0;
+    const interval = video.duration / frameCount; // Capture at equal intervals
+
+    video.addEventListener("loadeddata", async function () {
+        for (let i = 0; i < frameCount; i++) {
+            video.currentTime = currentTime;
+            await new Promise((resolve) => {
+                video.onseeked = function () {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    frames.push(canvas.toDataURL("image/png")); // Store frame
+                    resolve();
+                };
+            });
+            currentTime += interval;
+        }
+        console.log("Extracted frames:", frames);
+        sendFramesToModel(frames);
+    });
+}
+
     
     // Add to translation history
     function addToHistory(text, image) {
