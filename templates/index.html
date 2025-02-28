@@ -257,6 +257,59 @@
             font-size: 14px;
         }
         
+        /* Video preview styles */
+        .video-preview-container {
+            margin-top: 20px;
+            width: 100%;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        #videoPreview {
+            width: 100%;
+            border-radius: 10px;
+            background-color: #000;
+        }
+        
+        .loading-indicator {
+            display: none;
+            text-align: center;
+            margin-top: 15px;
+            color: var(--medium-gray);
+        }
+        
+        .loading-indicator.active {
+            display: block;
+        }
+        
+        /* Processing status styles */
+        .processing-status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            display: none;
+        }
+        
+        .processing-status.active {
+            display: block;
+        }
+        
+        .processing-status.processing {
+            background-color: rgba(52, 152, 219, 0.1);
+            color: var(--primary-color);
+        }
+        
+        .processing-status.completed {
+            background-color: rgba(46, 204, 113, 0.1);
+            color: #27ae60;
+        }
+        
+        .processing-status.error {
+            background-color: rgba(231, 76, 60, 0.1);
+            color: var(--accent-color);
+        }
+        
         @media (max-width: 768px) {
             .main-content {
                 flex-direction: column;
@@ -318,44 +371,53 @@
                 <!-- Video Upload Tab -->
                 <div id="video-upload-tab" class="tab-content">
                     <div class="upload-container">
-                        <label for="video-input" class="upload-area">
+                        <label for="video-input" class="upload-area" id="video-upload-area">
                             <i>🎥</i>
                             <p>Click to upload a video</p>
                             <p><small>Supports MP4, MOV, AVI</small></p>
                         </label>
-                        <input id="video-input" type="file" class="file-input" accept="video/*">
-                        <video id="videoPreview" controls style="display:none;"></video>
+                        <input id="video-input" type="file" class="file-input" accept="video/mp4,video/mov,video/avi">
+                        
+                        <!-- Video preview container -->
+                        <div class="video-preview-container" id="video-preview-container" style="display: none;">
+                            <video id="videoPreview" controls></video>
+                        </div>
+                        
+                        <!-- Loading/Processing indicators -->
+                        <div class="loading-indicator" id="video-loading">
+                            Uploading video... Please wait.
+                        </div>
+                        
+                        <div class="processing-status processing" id="processing-status">
+                            Processing video frames...
+                        </div>
                     </div>
                 </div>
                 
-                <button class="btn btn-primary" style="width: 100%;">Translate Sign</button>
+                <button class="btn btn-primary" id="translate-button" style="width: 100%;">Translate Sign</button>
             </div>
             
             <div class="output-section">
                 <h1>Translation Result</h1>
-                <div class="translation-result">
+                <div class="translation-result" id="translation-result">
                     <p>Translation will appear here...</p>
                 </div>
                 
                 <div class="actions">
-                    <button class="btn btn-outline">Copy Text</button>
-                    <button class="btn btn-outline">Text to Speech</button>
+                    <button class="btn btn-outline" id="copy-text-btn">Copy Text</button>
+                    <button class="btn btn-outline" id="text-to-speech-btn">Text to Speech</button>
                 </div>
                 
                 <div class="history-container">
                     <h1>Recent Translations</h1>
-                    <div class="history-item">
-                        <div class="history-thumbnail"></div>
-                        <div class="history-text">
-                            <p></p>
-                            <small></small>
-                        </div>
-                    </div>
-                    <div class="history-item">
-                        <div class="history-thumbnail"></div>
-                        <div class="history-text">
-                            <p></p>
-                            <small></small>
+                    <div id="recent-translations">
+                        <!-- Recent translations will be added dynamically here -->
+                        <div class="history-item">
+                            <div class="history-thumbnail"></div>
+                            <div class="history-text">
+                                <p>"Hello, how are you?"</p>
+                                <small>Today, 2:30 PM</small>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -381,6 +443,28 @@
                 button.classList.add('active');
                 document.getElementById(button.getAttribute('data-tab') + '-tab').classList.add('active');
             });
+        });
+
+        // Video input handling
+        document.getElementById('video-input').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                // Show video preview
+                const videoPreview = document.getElementById('videoPreview');
+                const videoPreviewContainer = document.getElementById('video-preview-container');
+                const uploadArea = document.getElementById('video-upload-area');
+                
+                // Create object URL for the video
+                const videoURL = URL.createObjectURL(file);
+                videoPreview.src = videoURL;
+                
+                // Hide upload area and show video preview
+                uploadArea.style.display = 'none';
+                videoPreviewContainer.style.display = 'block';
+                
+                // Video is now ready for processing
+                // This will be handled by your main.js
+            }
         });
     </script>
 </body>
