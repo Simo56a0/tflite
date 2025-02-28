@@ -279,84 +279,50 @@ document.addEventListener('DOMContentLoaded', function() {
         historyItem.appendChild(textContainer);
         
         // Add to history container (at the top)
-        if (historyItems.length > 0) {
-            historyContainer.insertBefore(historyItem, historyItems[0]);
-        } else {
-            historyContainer.appendChild(historyItem);
-        }
-        
-        // Limit history to 5 items
         if (historyItems.length >= 5) {
             historyContainer.removeChild(historyItems[historyItems.length - 1]);
         }
+        historyContainer.insertBefore(historyItem, historyItems[0]);
     }
     
-    // Copy text to clipboard
-    function copyText() {
-        const text = translationResult.textContent.trim();
-        if (text && text !== 'Translation will appear here...') {
-            navigator.clipboard.writeText(text)
-                .then(() => {
-                    // Show success message
-                    const originalText = copyButton.textContent;
-                    copyButton.textContent = 'Copied!';
-                    setTimeout(() => {
-                        copyButton.textContent = originalText;
-                    }, 2000);
-                })
-                .catch(err => {
-                    console.error('Failed to copy text:', err);
-                });
+    // Event Listeners
+    cameraButton.addEventListener('click', () => {
+        if (!stream) {
+            startCamera();
+        } else {
+            stopCamera();
         }
-    }
+    });
     
-    // Text to speech
-    function textToSpeech() {
-        const text = translationResult.querySelector('h2')?.textContent;
-        if (text && window.speechSynthesis) {
-            const utterance = new SpeechSynthesisUtterance(text);
-            window.speechSynthesis.speak(utterance);
-            
-            // Show speaking indicator
-            const originalText = speechButton.textContent;
-            speechButton.textContent = 'Speaking...';
-            
-            utterance.onend = function() {
-                speechButton.textContent = originalText;
-            };
-        }
-    }
+    captureButton.addEventListener('click', captureImage);
     
-    // Feature Extraction: Handle file upload
-    function handleFeatureFileUpload(file) {
-        if (!file) return;
-        
-        // Store the video file
+    translateButton.addEventListener('click', translateSign);
+    
+    // File input events
+    fileInput.addEventListener('change', function() {
+        const file = this.files[0];
+        handleFileUpload(file);
+    });
+    
+    // Feature extraction functionality
+    featureFileInput.addEventListener('change', function() {
+        const file = this.files[0];
         featureVideoFile = file;
-        
-        // Display video preview
-        const videoURL = URL.createObjectURL(file);
-        featureVideoPreview.src = videoURL;
-        featureVideoPreview.style.display = 'block';
-        
-        // Enable extract button
-        featureExtractButton.disabled = false;
-    }
-    
-    // Feature Extraction: Extract features from video
-    async function extractFeatures() {
+        featureUploadArea.textContent = `Video file selected: ${file.name}`;
+    });
+
+    featureExtractButton.addEventListener('click', async function() {
         if (!featureVideoFile) {
-            featureResultBox.innerHTML = '<p>Please upload a video first.</p>';
+            featureResultBox.style.display = 'none';
+            featureProgressContainer.style.display = 'block';
+            featureProgressBar.style.width = '100%';
             return;
         }
+
+        featureProgressContainer.style.display = 'block';
+        featureProgressBar.style.width = '20%';
         
         try {
-            // Show progress
-            featureProgressContainer.style.display = 'block';
-            featureProgressBar.style.width = '0%';
-            featureExtractButton.disabled = true;
-            
-            // Submit the file to the feature extraction endpoint
             const formData = new FormData();
             formData.append('file', featureVideoFile);
             
@@ -366,102 +332,26 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                throw new Error('Failed to extract features');
             }
             
-            const result = await response.json();
+            const data = await response.json();
             
-            // Show result
+            // Update progress bar and show features
             featureProgressBar.style.width = '100%';
+            featureProgressContainer.style.display = 'none';
             featureResultBox.style.display = 'block';
-            featureResult.textContent = JSON.stringify(result.features, null, 2);
+            
+            if (data.features) {
+                featureResult.innerHTML = `<pre>${JSON.stringify(data.features, null, 2)}</pre>`;
+            }
             
         } catch (error) {
             console.error('Feature extraction error:', error);
-            featureResultBox.innerHTML = `<p class="error">Error: ${error.message}</p>`;
-        } finally {
-            featureExtractButton.disabled = false;
-        }
-    }
-    
-    // Event listeners
-    cameraButton.addEventListener('click', function() {
-        if (stream) {
-            stopCamera();
-        } else {
-            startCamera();
+            featureProgressBar.style.width = '100%';
+            featureProgressContainer.style.display = 'none';
+            featureResultBox.style.display = 'block';
+            featureResult.innerHTML = `<p class="error">Error: ${error.message}</p>`;
         }
     });
-    
-    captureButton.addEventListener('click', captureImage);
-    
-    fileInput.addEventListener('change', function() {
-        if (this.files && this.files[0]) {
-            handleFileUpload(this.files[0]);
-        }
-    });
-    
-    uploadArea.addEventListener('click', function() {
-        fileInput.click();
-    });
-    
-    uploadArea.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        this.classList.add('dragover');
-    });
-    
-    uploadArea.addEventListener('dragleave', function() {
-        this.classList.remove('dragover');
-    });
-    
-    uploadArea.addEventListener('drop', function(e) {
-        e.preventDefault();
-        this.classList.remove('dragover');
-        
-        if (e.dataTransfer.files.length) {
-            handleFileUpload(e.dataTransfer.files[0]);
-        }
-    });
-    
-    translateButton.addEventListener('click', translateSign);
-    
-    copyButton.addEventListener('click', copyText);
-    
-    speechButton.addEventListener('click', textToSpeech);
-    
-    // Feature Extraction: Event listeners
-    featureFileInput.addEventListener('change', function() {
-        if (this.files && this.files[0]) {
-            handleFeatureFileUpload(this.files[0]);
-        }
-    });
-    
-    featureUploadArea.addEventListener('click', function() {
-        featureFileInput.click();
-    });
-    
-    featureUploadArea.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        this.classList.add('dragover');
-    });
-    
-    featureUploadArea.addEventListener('dragleave', function() {
-        this.classList.remove('dragover');
-    });
-    
-    featureUploadArea.addEventListener('drop', function(e) {
-        e.preventDefault();
-        this.classList.remove('dragover');
-        
-        if (e.dataTransfer.files.length) {
-            handleFeatureFileUpload(e.dataTransfer.files[0]);
-        }
-    });
-    
-    featureExtractButton.addEventListener('click', extractFeatures);
-    
-    // Initialize
-    translateButton.disabled = true;
-    captureButton.disabled = true;
-    featureExtractButton.disabled = true;
 });
