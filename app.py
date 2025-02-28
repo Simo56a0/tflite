@@ -86,7 +86,8 @@ def process_video(video_path):
     
     if predictions:
         final_prediction = max(set(predictions), key=predictions.count)
-        return {"class": final_prediction, "predictions": predictions}
+        confidence = predictions.count(final_prediction) / len(predictions)
+        return {"class": final_prediction, "confidence": confidence, "predictions": predictions}
     else:
         return {"error": "No valid frames processed"}
 
@@ -133,6 +134,53 @@ def predict_image():
         return jsonify(result)
     else:
         return jsonify({"error": "Invalid file type"}), 400
+
+# New route for video frame-by-frame translation
+@app.route('/translate', methods=['POST'])
+def translate_frames():
+    data = request.json
+    
+    if not data or 'frames' not in data:
+        return jsonify({"error": "No frames data"}), 400
+    
+    try:
+        frames = data['frames']
+        predictions = []
+        
+        # Process each frame
+        for frame_base64 in frames:
+            # Extract base64 data
+            if ',' in frame_base64:
+                frame_data = frame_base64.split(',')[1]
+            else:
+                frame_data = frame_base64
+                
+            # Decode base64 image
+            img_bytes = base64.b64decode(frame_data)
+            img_array = np.frombuffer(img_bytes, dtype=np.uint8)
+            frame = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+            
+            if frame is not None:
+                # Get prediction for this frame
+                result = predict(frame)
+                predictions.append(result['class'])
+        
+        if predictions:
+            # Get the most common prediction
+            final_prediction = max(set(predictions), key=predictions.count)
+            confidence = predictions.count(final_prediction) / len(predictions)
+            
+            return jsonify({
+                "translation": final_prediction,
+                "confidence": confidence,
+                "predictions": predictions
+            })
+        else:
+            return jsonify({"error": "No valid frames processed"})
+            
+    except Exception as e:
+        logger.error(f"Error processing frames: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/')
 def home():
