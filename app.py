@@ -24,7 +24,6 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'mp4', 'avi', 'mov'}
 
 # Create upload folder if it doesn't exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Sign language classes
@@ -37,7 +36,6 @@ input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
 
 def preprocess_image(image):
-    """Preprocess the image for model inference."""
     try:
         img = cv2.resize(image, (IMG_WIDTH, IMG_HEIGHT))
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -49,7 +47,6 @@ def preprocess_image(image):
         return None
 
 def predict(image):
-    """Make a prediction using the TFLite model."""
     processed_image = preprocess_image(image)
     if processed_image is None:
         return {"error": "Invalid image"}
@@ -59,64 +56,81 @@ def predict(image):
     output_data = interpreter.get_tensor(output_details[0]['index'])
     predicted_class_index = np.argmax(output_data[0])
     confidence = float(output_data[0][predicted_class_index])
-    
     predicted_class = SIGN_CLASSES[predicted_class_index] if predicted_class_index < len(SIGN_CLASSES) else "Unknown"
     return {"class": predicted_class, "confidence": confidence}
 
 @app.route('/translate', methods=['POST'])
 def translate_frames():
-    """Receive and process frames from the frontend."""
     data = request.json
     if not data or 'frames' not in data:
         return jsonify({"error": "No frames data"}), 400
-
     try:
         frames = data['frames']
         predictions = []
-
         for frame_base64 in frames:
             frame_data = frame_base64.split(',')[1] if ',' in frame_base64 else frame_base64
             img_bytes = base64.b64decode(frame_data)
             img_array = np.frombuffer(img_bytes, dtype=np.uint8)
             frame = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-
             if frame is not None:
                 result = predict(frame)
                 if "error" not in result:
                     predictions.append(result['class'])
-
         if predictions:
             final_prediction = max(set(predictions), key=predictions.count)
             confidence = predictions.count(final_prediction) / len(predictions)
             return jsonify({"translation": final_prediction, "confidence": confidence, "predictions": predictions})
         else:
             return jsonify({"error": "No valid frames processed"})
-
     except Exception as e:
         logger.error(f"Error processing frames: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/webcam-predict', methods=['POST'])
 def webcam_predict():
-    """Handle frame-by-frame predictions from the webcam."""
     try:
         frame_data = request.json.get("frame")
         if not frame_data:
             return jsonify({"error": "No frame data received"}), 400
-
         img_bytes = base64.b64decode(frame_data.split(',')[1])
         img_array = np.frombuffer(img_bytes, dtype=np.uint8)
         frame = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-
         if frame is not None:
             result = predict(frame)
             return jsonify(result)
         else:
             return jsonify({"error": "Failed to process image"}), 400
-
     except Exception as e:
         logger.error(f"Webcam processing error: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+@app.route('/predict-video', methods=['POST'])
+def predict_video():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+    if file and file.filename.split('.')[-1].lower() in ALLOWED_EXTENSIONS:
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+        file.save(file_path)
+        cap = cv2.VideoCapture(file_path)
+        frames = []
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+            frames.append(frame)
+        cap.release()
+        os.remove(file_path)
+        if not frames:
+            return jsonify({"error": "No frames extracted from video"}), 400
+        predictions = [predict(frame)['class'] for frame in frames if frame is not None]
+        final_prediction = max(set(predictions), key=predictions.count) if predictions else "Unknown"
+        confidence = predictions.count(final_prediction) / len(predictions) if predictions else 0
+        return jsonify({"class": final_prediction, "confidence": confidence})
+    else:
+        return jsonify({"error": "Invalid file type"}), 400
 
 @app.route('/')
 def home():
