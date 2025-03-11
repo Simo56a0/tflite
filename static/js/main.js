@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const cameraButton = document.getElementById('startWebcamBtn');
     const captureButton = document.querySelector('.btn-accent');
     const translateButton = document.getElementById('translate-button');
+    const stopCameraButton = document.getElementById('stopWebcamBtn');
     const videoFeed = document.querySelector('.video-feed');
     const fileInput = document.getElementById('file-input');
     const videoInput = document.getElementById('video-input');
@@ -91,6 +92,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     cameraButton.addEventListener('click', startCamera);
+    stopCameraButton.addEventListener('click', stopCamera);
     captureButton.addEventListener('click', captureImage);
     translateButton.addEventListener('click', captureImage);
     copyButton.addEventListener('click', function() {
