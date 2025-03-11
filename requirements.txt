@@ -6,3 +6,4 @@ tensorflow
 numpy 
 pillow
 opencv-python-headless 
+flask-cors
