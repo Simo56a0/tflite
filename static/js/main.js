@@ -58,7 +58,86 @@ document.addEventListener('DOMContentLoaded', function() {
             };
         }
     });
+ // second Function to extract frames from video
+    async function extractFramesFromVideo(videoElement, numFrames = 10) {
+        return new Promise((resolve) => {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            const frames = [];
+            
+            canvas.width = videoElement.videoWidth;
+            canvas.height = videoElement.videoHeight;
+            
+            const videoDuration = videoElement.duration;
+            const frameInterval = videoDuration / (numFrames + 1);
+            const frameTimestamps = Array.from({length: numFrames}, (_, i) => frameInterval * (i + 1));
+            
+            async function captureFrames() {
+                for (const timestamp of frameTimestamps) {
+                    await new Promise((resolveFrame) => {
+                        videoElement.currentTime = timestamp;
+                        videoElement.addEventListener('seeked', function onSeeked() {
+                            context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+                            frames.push(canvas.toDataURL('image/jpeg'));
+                            videoElement.removeEventListener('seeked', onSeeked);
+                            resolveFrame();
+                        }, { once: true });
+                    });
+                }
+                resolve(frames);
+            }
+            
+            captureFrames();
+        });
+    }
 
+    // Function to send extracted frames to the backend
+    async function sendFramesToBackend(frames) {
+        try {
+            const response = await fetch('/process-frames', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ frames })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Error: ${response.statusText}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.error('Error sending frames:', error);
+        }
+    }
+
+    // Modify the video processing logic to include frame extraction
+    videoInput.addEventListener('change', async function(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const videoURL = URL.createObjectURL(file);
+            videoPreview.src = videoURL;
+            videoPreview.style.display = 'block';
+            videoPreview.controls = true;
+            
+            videoPreview.onplay = async function() {
+                const frames = await extractFramesFromVideo(videoPreview);
+                console.log(`Extracted ${frames.length} frames.`);
+                const result = await sendFramesToBackend(frames);
+                
+                if (result && result.translation) {
+                    translationResult.innerHTML = `
+                        <h2 style="font-size: 36px; margin-bottom: 10px;">${result.translation}</h2>
+                        <p>Confidence: ${(result.confidence * 100).toFixed(2)}%</p>
+                    `;
+                } else {
+                    translationResult.innerHTML = `<p class="error">Error processing video.</p>`;
+                }
+            };
+        }
+    });
+
+    // Existing code remains unchanged...
+});
     // Extract frames from video and send for translation
     async function extractFramesAndTranslate(videoElement, videoFile) {
         // Show loading state
