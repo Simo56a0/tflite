@@ -567,6 +567,62 @@ document.addEventListener('DOMContentLoaded', function() {
             featureResult.innerHTML = `<p class="error">Error: ${error.message}</p>`;
         }
     });
+//extra code
+// Upload video for prediction
+function uploadVideo() {
+    let fileInput = document.getElementById("videoInput");
+    let file = fileInput.files[0];
+
+    if (!file) {
+        alert("Please select a file first.");
+        return;
+    }
+
+    let formData = new FormData();
+    formData.append("file", file);
+
+    fetch("/predict-video", {
+        method: "POST",
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById("result").innerText = `Prediction: ${data.class} (Confidence: ${data.confidence.toFixed(2)})`;
+    })
+    .catch(error => console.error("Error:", error));
+}
+
+// Start webcam feed
+function startWebcam() {
+    let video = document.getElementById("webcam");
+    navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => { video.srcObject = stream; })
+        .catch(error => console.error("Error accessing webcam:", error));
+}
+
+// Capture frame from webcam and send for prediction
+function captureFrame() {
+    let video = document.getElementById("webcam");
+    let canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    let ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    let frameBase64 = canvas.toDataURL("image/jpeg"); // Convert to Base64
+
+    fetch("/webcam-predict", {
+        method: "POST",
+        body: JSON.stringify({ frame: frameBase64 }),
+        headers: { "Content-Type": "application/json" }
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById("result").innerText = `Prediction: ${data.class} (Confidence: ${data.confidence.toFixed(2)})`;
+    })
+    .catch(error => console.error("Error:", error));
+}
+
 
     // Handle copy text button
     copyButton?.addEventListener('click', function() {
@@ -591,3 +647,5 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+
