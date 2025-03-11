@@ -344,15 +344,18 @@
                     <button class="toggle-btn" data-tab="upload">Upload Image</button>
                     <button class="toggle-btn" data-tab="video-upload">Upload Video</button> <!-- Added Video Upload Tab -->
                 </div>
-                
+      
+
                 <div id="camera-tab" class="tab-content active">
                     <div class="capture-container">
                         <div class="video-feed">
                             Camera feed will appear here
                         </div>
                         <div class="control-buttons">
-                            <button class="btn btn-primary">Start Camera</button>
-                            <button class="btn btn-accent">Capture</button>
+                            <video id="webcam" autoplay></video>
+                            <button class="btn btn-primary">Start Webcam</button>
+                            <button class="btn btn-accent">Capture & Predict</button>
+                            <p id="result">Prediction: </p>
                         </div>
                     </div>
                 </div>
